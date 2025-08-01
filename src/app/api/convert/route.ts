@@ -15,40 +15,39 @@ function parseMarkdownToSlides(markdown: string): SlideContent[] {
     .replace(/<style>[\s\S]*?<\/style>/, '')
     .trim();
 
-  // H3見出し（###）を区切り文字として、テキスト全体をセクションに分割
-  // (?=### )という正規表現を使うことで、###自体は各セクションの先頭に残す
-  const sections = cleanedMarkdown.split(/\n(?=### )/);
+  // 全ての見出し（#, ##, ###）を区切り文字として、テキスト全体をセクションに分割
+  // (?=###? )という正規表現を使って、#、##、###のいずれかで分割
+  const sections = cleanedMarkdown.split(/\n(?=#{1,3} )/);
 
   const slides: SlideContent[] = [];
 
-  sections.forEach((section, index) => {
+  sections.forEach((section) => {
     const trimmedSection = section.trim();
     if (trimmedSection === '') return;
 
     const lines = trimmedSection.split('\n');
     let title = '';
     let contentLines: string[] = [];
+    let level = 1;
 
-    // 最初のセクションで、かつH1見出しがある場合は、それをタイトルスライドとして扱う
-    if (index === 0 && lines[0].startsWith('# ')) {
-      title = lines[0].replace(/^# /, '').trim();
-      // H2が続く場合、それもタイトルに含める
-      if (lines.length > 1 && lines[1].startsWith('## ')) {
-        title += `\n${lines[1].replace(/^## /, '').trim()}`;
-        contentLines = lines.slice(2);
-      } else {
-        contentLines = lines.slice(1);
-      }
-    } 
-    // H3見出しで始まるセクションの処理
-    else if (lines[0].startsWith('### ')) {
+    // 見出しの処理
+    if (lines[0].startsWith('### ')) {
       title = lines[0].replace(/^### /, '').trim();
       contentLines = lines.slice(1);
-    } 
-    // それ以外の予期せぬセクションは、最初の行をタイトルとして扱う
-    else {
+      level = 3;
+    } else if (lines[0].startsWith('## ')) {
+      title = lines[0].replace(/^## /, '').trim();
+      contentLines = lines.slice(1);
+      level = 2;
+    } else if (lines[0].startsWith('# ')) {
+      title = lines[0].replace(/^# /, '').trim();
+      contentLines = lines.slice(1);
+      level = 1;
+    } else {
+      // 見出しがない場合は、最初の行をタイトルとして扱う
       title = lines[0];
       contentLines = lines.slice(1);
+      level = 1;
     }
 
     const content = contentLines.join('\n').trim();
@@ -57,7 +56,7 @@ function parseMarkdownToSlides(markdown: string): SlideContent[] {
       slides.push({
         title: title || ' ',
         content: [content],
-        level: title.startsWith('# ') ? 1 : 3,
+        level: level,
       });
     }
   });
