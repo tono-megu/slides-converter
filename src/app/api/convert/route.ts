@@ -9,52 +9,57 @@ interface SlideContent {
 }
 
 function parseMarkdownToSlides(markdown: string): SlideContent[] {
-  // 1. Markdown全体を "---" で分割して、各スライドの塊に分ける
-  const slideSections = markdown.split(/\n---\n/);
+  // Marp用のFrontmatterやstyleタグを事前に除去
+  const cleanedMarkdown = markdown
+    .replace(/---[\s\S]*?---/, '')
+    .replace(/<style>[\s\S]*?<\/style>/, '')
+    .trim();
+
+  // H2見出し（##）を区切り文字として、テキスト全体をセクションに分割
+  // (?=## )という正規表現を使うことで、##自体は各セクションの先頭に残す
+  const sections = cleanedMarkdown.split(/\n(?=## )/);
 
   const slides: SlideContent[] = [];
 
-  slideSections.forEach(section => {
+  sections.forEach((section, index) => {
     const trimmedSection = section.trim();
-    if (trimmedSection === '') {
-      return; // 空のセクションはスキップ
-    }
+    if (trimmedSection === '') return;
 
     const lines = trimmedSection.split('\n');
     let title = '';
     let contentLines: string[] = [];
-    let titleFound = false;
 
-    // 2. 各スライドの最初の見出し（# や ##）をタイトルとして探し、残りを内容とする
-    for (const line of lines) {
-      if (line.startsWith('#') && !titleFound) {
-        title = line.replace(/#/g, '').trim();
-        titleFound = true;
+    // 最初のセクションで、かつH1見出しがある場合は、それをタイトルスライドとして扱う
+    if (index === 0 && lines[0].startsWith('# ')) {
+      title = lines[0].replace(/^# /, '').trim();
+      // H2が続く場合、それもタイトルに含める
+      if (lines.length > 1 && lines[1].startsWith('## ')) {
+        title += `\n${lines[1].replace(/^## /, '').trim()}`;
+        contentLines = lines.slice(2);
       } else {
-        contentLines.push(line);
+        contentLines = lines.slice(1);
       }
-    }
-
-    // 3. もし見出しがなければ、最初の行をタイトルとする
-    if (!titleFound && lines.length > 0) {
-      title = lines[0].trim();
+    } 
+    // H2見出しで始まるセクションの処理
+    else if (lines[0].startsWith('## ')) {
+      title = lines[0].replace(/^## /, '').trim();
+      contentLines = lines.slice(1);
+    } 
+    // それ以外の予期せぬセクションは、最初の行をタイトルとして扱う
+    else {
+      title = lines[0];
       contentLines = lines.slice(1);
     }
-    
-    // HTMLタグを簡易的に除去（不要なタグがPPTXに出力されるのを防ぐ）
-    const cleanedContent = contentLines.join('\n')
-      .replace(/<div.*?>/g, '')
-      .replace(/<\/div>/g, '')
-      .replace(/<strong.*?>/g, '')
-      .replace(/<\/strong>/g, '')
-      .replace(/<br>/g, '\n')
-      .trim();
 
-    slides.push({
-      title: title || ' ', // タイトルが空の場合はスペースを入れる
-      content: [cleanedContent], // 全ての内容を一つのテキストブロックとして格納
-      level: 1 
-    });
+    const content = contentLines.join('\n').trim();
+
+    if (title || content) {
+      slides.push({
+        title: title || ' ',
+        content: [content],
+        level: title.startsWith('# ') ? 1 : 2,
+      });
+    }
   });
 
   return slides;
