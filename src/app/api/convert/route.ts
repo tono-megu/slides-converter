@@ -9,55 +9,51 @@ interface SlideContent {
 }
 
 function parseMarkdownToSlides(markdown: string): SlideContent[] {
-  const slides: SlideContent[] = [];
-  let currentSlide: SlideContent | null = null;
-
   // Marp用のFrontmatterやstyleタグを事前に除去
   const cleanedMarkdown = markdown
-    .replace(/---[\s\S]*?---/, '')
-    .replace(/<style>[\s\S]*?<\/style>/, '')
+    .replace(/^---[\s\S]*?---/, '') // 先頭のfrontmatterのみ除去
+    .replace(/<style>[\s\S]*?<\/style>/g, '') // styleブロックを除去
     .trim();
 
-  const lines = cleanedMarkdown.split('\n');
+  // --- を区切り文字として、各スライドのMarkdown文字列に分割
+  const slideSections = cleanedMarkdown.split(/\n---\n/);
 
-  for (const line of lines) {
-    const trimmedLine = line.trim();
+  const slides: SlideContent[] = slideSections.map(section => {
+    const trimmedSection = section.trim();
+    const lines = trimmedSection.split('\n');
+    
+    let title = '';
+    let contentLines: string[] = [];
+    let titleFound = false;
 
-    // --- または見出しの場合、新しいスライドを開始する
-    if (trimmedLine === '---' || trimmedLine.startsWith('#')) {
-      // 既存のスライドがあれば、配列に追加
-      if (currentSlide) {
-        slides.push(currentSlide);
+    // 最初の見出しを探してタイトルに設定
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.startsWith('#') && !titleFound) {
+        title = line.replace(/^#+\s*/, '').trim();
+        titleFound = true;
+      } else {
+        contentLines.push(line);
       }
-      
-      // --- は区切り専用なので、新しいスライドは作らない
-      if (trimmedLine === '---') {
-        currentSlide = null;
-        continue;
-      }
-
-      // 新しいスライドを初期化
-      currentSlide = {
-        title: trimmedLine.replace(/^#+\s*/, '').trim(),
-        content: [],
-        level: (trimmedLine.match(/#/g) || []).length || 1,
-      };
-    } else if (currentSlide) {
-      // 見出し以外の行は、現在のスライドの本文に追加
-      currentSlide.content.push(line);
     }
-  }
 
-  // 最後のスライドを配列に追加
-  if (currentSlide) {
-    slides.push(currentSlide);
-  }
-  
-  // 本文を一つの文字列にまとめる
-  return slides.map(slide => ({
-    ...slide,
-    content: [slide.content.join('\n').trim()],
-  }));
+    // もし見出しが一つも見つからなければ、最初の行をタイトルにする
+    if (!titleFound && lines.length > 0) {
+      title = lines[0];
+      contentLines = lines.slice(1);
+    }
+
+    // 本文を一つの文字列にまとめる
+    const content = contentLines.join('\n').trim();
+
+    return {
+      title: title || ' ',
+      content: [content],
+      level: 1, // レベルは一旦1に固定
+    };
+  }).filter(slide => slide.title.trim() !== '' || slide.content[0].trim() !== ''); // 空のスライドを除去
+
+  return slides;
 }
 
 async function createPPTX(slides: SlideContent[]): Promise<Buffer> {
