@@ -23,32 +23,50 @@ function parseMarkdownToSlides(markdown: string): SlideContent[] {
 
   sections.forEach(section => {
     const trimmedSection = section.trim();
-    if (trimmedSection === '' || trimmedSection === '---') {
-      return; // 空のセクションや---だけのセクションはスキップ
+    if (trimmedSection === '') {
+      return; // 空のセクションはスキップ
     }
 
     const lines = trimmedSection.split('\n');
     let title = '';
     let contentLines: string[] = [];
     
+    // ---だけの行の場合は、次の行以降を処理
+    if (lines[0] === '---') {
+      // ---の次の行が見出しの場合
+      if (lines.length > 1 && lines[1].startsWith('#')) {
+        title = lines[1].replace(/^#+\s*/, '').trim();
+        contentLines = lines.slice(2);
+      } else if (lines.length > 1) {
+        // ---の次の行をタイトルとする
+        title = lines[1];
+        contentLines = lines.slice(2);
+      } else {
+        title = 'スライド';
+        contentLines = [];
+      }
+    }
     // 最初の行が見出しであれば、それをタイトルとして抽出
-    if (lines[0].startsWith('#')) {
+    else if (lines[0].startsWith('#')) {
       title = lines[0].replace(/^#+\s*/, '').trim();
       contentLines = lines.slice(1);
     } else {
       // 見出しがない場合は、最初の行をタイトルとし、残りを内容とする
-      // (---で区切られたセクションなどを想定)
-      title = lines[0];
+      title = lines[0] || 'スライド';
       contentLines = lines.slice(1);
     }
 
-    const content = contentLines.join('\n').trim();
+    // 全てのコンテンツを保持（空行も含めて）
+    const content = contentLines.join('\n');
 
-    slides.push({
-      title: title || ' ', // タイトルが空の場合はスペースを挿入
-      content: [content],
-      level: (lines[0].match(/#/g) || []).length || 1, // 見出しレベルを#の数で判定
-    });
+    // タイトルまたはコンテンツがある場合のみスライドを追加
+    if (title.trim() || content.trim()) {
+      slides.push({
+        title: title || 'スライド',
+        content: [content], // 空でもコンテンツを保持
+        level: (lines[0].match(/#/g) || []).length || 1,
+      });
+    }
   });
 
   return slides;
