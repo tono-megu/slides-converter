@@ -9,7 +9,7 @@ interface SlideContent {
 }
 
 function parseMarkdownToSlides(markdown: string): SlideContent[] {
-  const md = new MarkdownIt();
+  const md = new MarkdownIt({ html: true });
   const tokens = md.parse(markdown, md.env);
   const slides: SlideContent[] = [];
   let currentSlide: SlideContent | null = null;
@@ -114,7 +114,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please upload a .md file' }, { status: 400 });
     }
 
-    const markdown = await file.text();
+    let markdown = await file.text();
+
+    // MarpのFrontmatterとstyleブロックを事前に除去して、
+    // 純粋なMarkdownコンテンツのみをパーサーに渡す
+    markdown = markdown
+      .replace(/---[\s\S]*?---/, '') // Frontmatterを除去
+      .replace(/<style>[\s\S]*?<\/style>/, ''); // styleブロックを除去
+
     const slides = parseMarkdownToSlides(markdown);
 
     if (slides.length === 0) {
