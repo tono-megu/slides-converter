@@ -9,56 +9,55 @@ interface SlideContent {
 }
 
 function parseMarkdownToSlides(markdown: string): SlideContent[] {
+  const slides: SlideContent[] = [];
+
   // Marp用のFrontmatterやstyleタグを事前に除去
   const cleanedMarkdown = markdown
     .replace(/---[\s\S]*?---/, '')
     .replace(/<style>[\s\S]*?<\/style>/, '')
     .trim();
 
-  // 全ての見出し（#, ##, ###）を区切り文字として、テキスト全体をセクションに分割
-  // (?=###? )という正規表現を使って、#、##、###のいずれかで分割
-  const sections = cleanedMarkdown.split(/\n(?=#{1,3} )/);
+  // --- でメジャーなセクションに分割
+  const majorSections = cleanedMarkdown.split(/\n---\n/);
 
-  const slides: SlideContent[] = [];
+  majorSections.forEach(majorSection => {
+    if (majorSection.trim() === '') return;
 
-  sections.forEach((section) => {
-    const trimmedSection = section.trim();
-    if (trimmedSection === '') return;
+    // H2見出し（##）でさらにスライドに分割
+    const slideSections = majorSection.split(/\n(?=## )/);
 
-    const lines = trimmedSection.split('\n');
-    let title = '';
-    let contentLines: string[] = [];
-    let level = 1;
+    slideSections.forEach((section, index) => {
+      const trimmedSection = section.trim();
+      if (trimmedSection === '') return;
 
-    // 見出しの処理
-    if (lines[0].startsWith('### ')) {
-      title = lines[0].replace(/^### /, '').trim();
-      contentLines = lines.slice(1);
-      level = 3;
-    } else if (lines[0].startsWith('## ')) {
-      title = lines[0].replace(/^## /, '').trim();
-      contentLines = lines.slice(1);
-      level = 2;
-    } else if (lines[0].startsWith('# ')) {
-      title = lines[0].replace(/^# /, '').trim();
-      contentLines = lines.slice(1);
-      level = 1;
-    } else {
-      // 見出しがない場合は、最初の行をタイトルとして扱う
-      title = lines[0];
-      contentLines = lines.slice(1);
-      level = 1;
-    }
+      const lines = trimmedSection.split('\n');
+      let title = '';
+      let contentLines: string[] = [];
+      let titleFound = false;
 
-    const content = contentLines.join('\n').trim();
+      // H1またはH2見出しをタイトルとして抽出
+      if (lines[0].startsWith('#')) {
+        title = lines[0].replace(/^#+\s*/, '').trim();
+        contentLines = lines.slice(1);
+        titleFound = true;
+      }
 
-    if (title || content) {
-      slides.push({
-        title: title || ' ',
-        content: [content],
-        level: level,
-      });
-    }
+      // 見出しが見つからない場合は、セクションの最初の行をタイトルとする
+      if (!titleFound && lines.length > 0) {
+        title = lines[0];
+        contentLines = lines.slice(1);
+      }
+      
+      const content = contentLines.join('\n').trim();
+
+      if (title || content) {
+        slides.push({
+          title: title || ' ',
+          content: [content],
+          level: (title.match(/^#/) || []).length,
+        });
+      }
+    });
   });
 
   return slides;
