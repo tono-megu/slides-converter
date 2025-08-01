@@ -15,9 +15,9 @@ function parseMarkdownToSlides(markdown: string): SlideContent[] {
     .replace(/<style>[\s\S]*?<\/style>/, '')
     .trim();
 
-  // H2見出し（##）を区切り文字として、テキスト全体をセクションに分割
-  // (?=## )という正規表現を使うことで、##自体は各セクションの先頭に残す
-  const sections = cleanedMarkdown.split(/\n(?=## )/);
+  // H3見出し（###）を区切り文字として、テキスト全体をセクションに分割
+  // (?=### )という正規表現を使うことで、###自体は各セクションの先頭に残す
+  const sections = cleanedMarkdown.split(/\n(?=### )/);
 
   const slides: SlideContent[] = [];
 
@@ -40,9 +40,9 @@ function parseMarkdownToSlides(markdown: string): SlideContent[] {
         contentLines = lines.slice(1);
       }
     } 
-    // H2見出しで始まるセクションの処理
-    else if (lines[0].startsWith('## ')) {
-      title = lines[0].replace(/^## /, '').trim();
+    // H3見出しで始まるセクションの処理
+    else if (lines[0].startsWith('### ')) {
+      title = lines[0].replace(/^### /, '').trim();
       contentLines = lines.slice(1);
     } 
     // それ以外の予期せぬセクションは、最初の行をタイトルとして扱う
@@ -57,7 +57,7 @@ function parseMarkdownToSlides(markdown: string): SlideContent[] {
       slides.push({
         title: title || ' ',
         content: [content],
-        level: title.startsWith('# ') ? 1 : 2,
+        level: title.startsWith('# ') ? 1 : 3,
       });
     }
   });
