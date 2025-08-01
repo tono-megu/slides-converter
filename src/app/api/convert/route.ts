@@ -9,44 +9,55 @@ interface SlideContent {
 }
 
 function parseMarkdownToSlides(markdown: string): SlideContent[] {
-  const md = new MarkdownIt({ html: true });
-  const tokens = md.parse(markdown, md.env);
-  const slides: SlideContent[] = [];
-  let currentSlide: SlideContent | null = null;
-  let collectingContent = false;
+  // 1. Markdown全体を "---" で分割して、各スライドの塊に分ける
+  const slideSections = markdown.split(/\n---\n/);
 
-  for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i];
-    
-    if (token.type === 'heading_open') {
-      if (currentSlide) {
-        slides.push(currentSlide);
-      }
-      
-      const level = parseInt(token.tag.replace('h', ''));
-      currentSlide = {
-        title: '',
-        content: [],
-        level
-      };
-      collectingContent = false;
-    } else if (token.type === 'inline' && currentSlide && !currentSlide.title) {
-      currentSlide.title = token.content;
-      collectingContent = true;
-    } else if (token.type === 'paragraph_open' && currentSlide && collectingContent) {
-      // Skip paragraph opening
-    } else if (token.type === 'inline' && currentSlide && currentSlide.title && collectingContent) {
-      if (token.content.trim()) {
-        currentSlide.content.push(token.content);
+  const slides: SlideContent[] = [];
+
+  slideSections.forEach(section => {
+    const trimmedSection = section.trim();
+    if (trimmedSection === '') {
+      return; // 空のセクションはスキップ
+    }
+
+    const lines = trimmedSection.split('\n');
+    let title = '';
+    let contentLines: string[] = [];
+    let titleFound = false;
+
+    // 2. 各スライドの最初の見出し（# や ##）をタイトルとして探し、残りを内容とする
+    for (const line of lines) {
+      if (line.startsWith('#') && !titleFound) {
+        title = line.replace(/#/g, '').trim();
+        titleFound = true;
+      } else {
+        contentLines.push(line);
       }
     }
-  }
 
-  if (currentSlide) {
-    slides.push(currentSlide);
-  }
+    // 3. もし見出しがなければ、最初の行をタイトルとする
+    if (!titleFound && lines.length > 0) {
+      title = lines[0].trim();
+      contentLines = lines.slice(1);
+    }
+    
+    // HTMLタグを簡易的に除去（不要なタグがPPTXに出力されるのを防ぐ）
+    const cleanedContent = contentLines.join('\n')
+      .replace(/<div.*?>/g, '')
+      .replace(/<\/div>/g, '')
+      .replace(/<strong.*?>/g, '')
+      .replace(/<\/strong>/g, '')
+      .replace(/<br>/g, '\n')
+      .trim();
 
-  return slides.filter(slide => slide.title);
+    slides.push({
+      title: title || ' ', // タイトルが空の場合はスペースを入れる
+      content: [cleanedContent], // 全ての内容を一つのテキストブロックとして格納
+      level: 1 
+    });
+  });
+
+  return slides;
 }
 
 async function createPPTX(slides: SlideContent[]): Promise<Buffer> {
@@ -55,7 +66,7 @@ async function createPPTX(slides: SlideContent[]): Promise<Buffer> {
   // Title slide
   const titleSlide = pptx.addSlide();
   titleSlide.background = { fill: '2E86AB' };
-  titleSlide.addText('Generated from Markdown', {
+  titleSlide.addText('マークダウンから生成', {
     x: 1,
     y: 2,
     w: 8,
@@ -107,11 +118,11 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File;
 
     if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+      return NextResponse.json({ error: 'ファイルがアップロードされていません' }, { status: 400 });
     }
 
     if (!file.name.endsWith('.md')) {
-      return NextResponse.json({ error: 'Please upload a .md file' }, { status: 400 });
+      return NextResponse.json({ error: '.mdファイルをアップロードしてください' }, { status: 400 });
     }
 
     let markdown = await file.text();
@@ -125,7 +136,7 @@ export async function POST(request: NextRequest) {
     const slides = parseMarkdownToSlides(markdown);
 
     if (slides.length === 0) {
-      return NextResponse.json({ error: 'No valid slides found in markdown' }, { status: 400 });
+      return NextResponse.json({ error: 'マークダウンファイルに有効なスライドが見つかりません' }, { status: 400 });
     }
 
     const pptxBuffer = await createPPTX(slides);
@@ -137,7 +148,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error converting markdown to PPTX:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('マークダウンからPPTXへの変換エラー:', error);
+    return NextResponse.json({ error: 'サーバー内部エラー' }, { status: 500 });
   }
 }

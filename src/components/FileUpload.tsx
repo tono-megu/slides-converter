@@ -13,12 +13,12 @@ export default function FileUpload() {
     if (!file) return;
 
     if (!file.name.endsWith('.md')) {
-      setMessage('Please upload a .md file');
+      setMessage('.mdファイルをアップロードしてください');
       return;
     }
 
     setIsConverting(true);
-    setMessage('Converting...');
+    setMessage('変換中...');
 
     try {
       const formData = new FormData();
@@ -31,7 +31,7 @@ export default function FileUpload() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Conversion failed');
+        throw new Error(error.error || '変換に失敗しました');
       }
 
       const blob = await response.blob();
@@ -44,9 +44,9 @@ export default function FileUpload() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      setMessage('Successfully converted! Download started.');
+      setMessage('変換が完了しました！ダウンロードを開始します。');
     } catch (error) {
-      setMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setMessage(`エラー: ${error instanceof Error ? error.message : '不明なエラー'}`);
     } finally {
       setIsConverting(false);
     }
@@ -63,7 +63,7 @@ export default function FileUpload() {
   return (
     <div className="max-w-2xl mx-auto p-8">
       <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">
-        Markdown to PowerPoint Converter
+        マークダウン → パワーポイント 変換ツール
       </h1>
       
       <div
@@ -80,19 +80,19 @@ export default function FileUpload() {
         
         {isConverting ? (
           <div>
-            <div className="text-lg font-medium text-gray-700 mb-2">Converting...</div>
+            <div className="text-lg font-medium text-gray-700 mb-2">変換中...</div>
             <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
           </div>
         ) : isDragActive ? (
           <div className="text-lg font-medium text-blue-600">
-            Drop your markdown file here...
+            マークダウンファイルをここにドロップしてください...
           </div>
         ) : (
           <div>
             <div className="text-lg font-medium text-gray-700 mb-2">
-              Drag & drop a .md file here
+              .mdファイルをここにドラッグ&ドロップ
             </div>
-            <div className="text-gray-500">or click to select</div>
+            <div className="text-gray-500">またはクリックしてファイルを選択</div>
           </div>
         )}
       </div>
@@ -108,12 +108,12 @@ export default function FileUpload() {
       )}
 
       <div className="mt-8 text-sm text-gray-600">
-        <h3 className="font-semibold mb-2">How it works:</h3>
+        <h3 className="font-semibold mb-2">使い方:</h3>
         <ul className="list-disc list-inside space-y-1">
-          <li>Upload a markdown (.md) file</li>
-          <li>Headings (# ## ###) become slide titles</li>
-          <li>Content under each heading becomes slide content</li>
-          <li>Download the generated PowerPoint file</li>
+          <li>マークダウンファイル(.md)をアップロード</li>
+          <li>見出し（# ## ###）がスライドタイトルになります</li>
+          <li>各見出しの下の内容がスライドの本文になります</li>
+          <li>生成されたパワーポイントファイルをダウンロード</li>
         </ul>
       </div>
     </div>
