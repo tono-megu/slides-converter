@@ -17,55 +17,45 @@ function parseMarkdownToSlides(markdown: string): SlideContent[] {
     .replace(/<style>[\s\S]*?<\/style>/g, '') // styleブロックを除去
     .trim();
 
-  // --- を区切り文字として、各スライドのMarkdown文字列に分割
-  const slideSections = cleanedMarkdown.split(/\n---\n/);
+  // 1. まずMarkdown全体を一度にHTMLへ変換する
+  const fullHtml = md.render(cleanedMarkdown);
 
-  const slides: SlideContent[] = slideSections.map(section => {
-    const trimmedSection = section.trim();
-    const lines = trimmedSection.split('\n');
-    
+  // 2. --- (HRタグ) でスライドごとのHTMLセクションに分割
+  const slideHtmlSections = fullHtml.split('<hr>');
+
+  const slides: SlideContent[] = slideHtmlSections.map(htmlSection => {
     let title = '';
-    let contentLines: string[] = [];
-    let titleFound = false;
+    let contentHtml = htmlSection.trim();
 
-    // 最初の見出しを探してタイトルに設定
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.startsWith('#') && !titleFound) {
-        title = line.replace(/^#+\s*/, '').trim();
-        titleFound = true;
-      } else {
-        contentLines.push(line);
-      }
+    // 3. 各セクションから最初の見出しタグを探してタイトルとする
+    const headingMatch = contentHtml.match(/<h([1-3])[^>]*>([\s\S]*?)<\/h\1>/);
+    if (headingMatch) {
+      // headingMatch[2] には見出しタグの中身が含まれる
+      // 中身にさらにタグが含まれる可能性があるので、それも除去してテキストだけにする
+      title = headingMatch[2].replace(/<[^>]*>/g, '').trim();
+      
+      // タイトルにした見出しタグを本文から削除
+      contentHtml = contentHtml.replace(headingMatch[0], '');
     }
 
-    // もし見出しが一つも見つからなければ、最初の行をタイトルにする
-    if (!titleFound && lines.length > 0) {
-      title = lines[0];
-      contentLines = lines.slice(1);
-    }
-
-    // 本文のMarkdownをHTMLにレンダリング
-    const rawContentHtml = md.render(contentLines.join('\n'));
-    
-    // HTMLを構造を維持したプレーンテキストに変換
-    const plainTextContent = rawContentHtml
-      .replace(/<\/p>|<\/li>|<\/h[1-6]>|<br\/?>/gi, '\n') // ブロック要素や改行タグを改行に
-      .replace(/<li>/gi, ' - ') // 箇条書きのマーカーを追加
-      .replace(/<[^>]*>/g, '') // 残りのHTMLタグをすべて除去
-      .replace(/&lt;/g, '<')   // HTMLエンティティをデコード
+    // 4. 残りのHTMLから構造を維持しつつプレーンテキストに変換
+    const plainTextContent = contentHtml
+      .replace(/<p>|<\/p>|<\/li>|<\/h[1-6]>|<br\/?>/gi, '\n') // ブロック要素や改行タグを改行に
+      .replace(/<li>/gi, ' - ')      // 箇条書きのマーカーを追加
+      .replace(/<[^>]*>/g, '')      // 残りのHTMLタグをすべて除去
+      .replace(/&lt;/g, '<')        // HTMLエンティティをデコード
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .replace(/&amp;/g, '&')
-      .replace(/\n{3,}/g, '\n\n') // 3つ以上連続する改行を2つにまとめる
+      .replace(/\n{3,}/g, '\n\n')    // 3つ以上連続する改行を2つにまとめる
       .trim();
 
     return {
       title: title || ' ',
       content: [plainTextContent],
-      level: 1, 
+      level: headingMatch ? parseInt(headingMatch[1], 10) : 1,
     };
-  }).filter(slide => slide.title.trim() !== '' || (slide.content.length > 0 && slide.content[0].trim() !== ''));
+  }).filter(slide => slide.title.trim() !== '' || (slide.content.length > 0 && slide.content[0].trim() !== '')); // 完全に空のスライドを除去
 
   return slides;
 }
