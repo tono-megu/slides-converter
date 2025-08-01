@@ -9,54 +9,45 @@ interface SlideContent {
 }
 
 function parseMarkdownToSlides(markdown: string): SlideContent[] {
-  const slides: SlideContent[] = [];
-
   // Marp用のFrontmatterやstyleタグを事前に除去
   const cleanedMarkdown = markdown
     .replace(/---[\s\S]*?---/, '')
     .replace(/<style>[\s\S]*?<\/style>/, '')
     .trim();
 
-  // --- でメジャーなセクションに分割
-  const majorSections = cleanedMarkdown.split(/\n---\n/);
+  // ---, #, ##, ### を区切り文字としてセクションに分割
+  // 正規表現の(?=...)は「肯定先読み」で、区切り文字自体をセクションの先頭に残す
+  const sections = cleanedMarkdown.split(/\n(?=---|# |## |### )/);
 
-  majorSections.forEach(majorSection => {
-    if (majorSection.trim() === '') return;
+  const slides: SlideContent[] = [];
 
-    // H2見出し（##）でさらにスライドに分割
-    const slideSections = majorSection.split(/\n(?=## )/);
+  sections.forEach(section => {
+    const trimmedSection = section.trim();
+    if (trimmedSection === '' || trimmedSection === '---') {
+      return; // 空のセクションや---だけのセクションはスキップ
+    }
 
-    slideSections.forEach((section, index) => {
-      const trimmedSection = section.trim();
-      if (trimmedSection === '') return;
+    const lines = trimmedSection.split('\n');
+    let title = '';
+    let contentLines: string[] = [];
+    
+    // 最初の行が見出しであれば、それをタイトルとして抽出
+    if (lines[0].startsWith('#')) {
+      title = lines[0].replace(/^#+\s*/, '').trim();
+      contentLines = lines.slice(1);
+    } else {
+      // 見出しがない場合は、最初の行をタイトルとし、残りを内容とする
+      // (---で区切られたセクションなどを想定)
+      title = lines[0];
+      contentLines = lines.slice(1);
+    }
 
-      const lines = trimmedSection.split('\n');
-      let title = '';
-      let contentLines: string[] = [];
-      let titleFound = false;
+    const content = contentLines.join('\n').trim();
 
-      // H1またはH2見出しをタイトルとして抽出
-      if (lines[0].startsWith('#')) {
-        title = lines[0].replace(/^#+\s*/, '').trim();
-        contentLines = lines.slice(1);
-        titleFound = true;
-      }
-
-      // 見出しが見つからない場合は、セクションの最初の行をタイトルとする
-      if (!titleFound && lines.length > 0) {
-        title = lines[0];
-        contentLines = lines.slice(1);
-      }
-      
-      const content = contentLines.join('\n').trim();
-
-      if (title || content) {
-        slides.push({
-          title: title || ' ',
-          content: [content],
-          level: (title.match(/^#/) || []).length,
-        });
-      }
+    slides.push({
+      title: title || ' ', // タイトルが空の場合はスペースを挿入
+      content: [content],
+      level: (lines[0].match(/#/g) || []).length || 1, // 見出しレベルを#の数で判定
     });
   });
 
