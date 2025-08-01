@@ -96,15 +96,9 @@ async function createPPTX(slides: SlideContent[]): Promise<Buffer> {
     }
   });
 
-  return new Promise((resolve, reject) => {
-    pptx.write('nodebuffer', (data: Buffer | string) => {
-      if (data instanceof Buffer) {
-        resolve(data);
-      } else {
-        reject(new Error('Failed to generate PPTX'));
-      }
-    });
-  });
+  // 変更点：PromiseベースのAPIを直接呼び出す
+  const pptxBuffer = await pptx.write('nodebuffer');
+  return pptxBuffer as Buffer;
 }
 
 export async function POST(request: NextRequest) {
