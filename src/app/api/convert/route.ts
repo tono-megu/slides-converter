@@ -9,6 +9,8 @@ interface SlideContent {
 }
 
 function parseMarkdownToSlides(markdown: string): SlideContent[] {
+  const md = new MarkdownIt({ html: true });
+
   // Marp用のFrontmatterやstyleタグを事前に除去
   const cleanedMarkdown = markdown
     .replace(/^---[\s\S]*?---/, '') // 先頭のfrontmatterのみ除去
@@ -43,15 +45,20 @@ function parseMarkdownToSlides(markdown: string): SlideContent[] {
       contentLines = lines.slice(1);
     }
 
-    // 本文を一つの文字列にまとめる
-    const content = contentLines.join('\n').trim();
+    // 本文のMarkdownをHTMLにレンダリング
+    const rawContentHtml = md.render(contentLines.join('\n'));
+    // HTMLタグを除去し、整形してプレーンテキストにする
+    const plainTextContent = rawContentHtml
+      .replace(/<[^>]*>/g, '\n') // 全てのHTMLタグを改行に変換
+      .replace(/\n{3,}/g, '\n\n') // 3つ以上連続する改行を2つにまとめる
+      .trim();
 
     return {
       title: title || ' ',
-      content: [content],
+      content: [plainTextContent],
       level: 1, // レベルは一旦1に固定
     };
-  }).filter(slide => slide.title.trim() !== '' || slide.content[0].trim() !== ''); // 空のスライドを除去
+  }).filter(slide => slide.title.trim() !== '' || (slide.content.length > 0 && slide.content[0].trim() !== '')); // 完全に空のスライドを除去
 
   return slides;
 }
